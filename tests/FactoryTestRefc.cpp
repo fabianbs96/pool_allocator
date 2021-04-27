@@ -60,5 +60,9 @@ int main() {
 
   std::cout << "value3': " << *shared_double_cpy << std::endl;
 
+  static mem::refc<int>::singleton static_int(435761);
+  mem::refc<int> shared_static_int(static_int);
+  std::cout << "value4:  " << *shared_static_int << std::endl;
+
   foo();
 }

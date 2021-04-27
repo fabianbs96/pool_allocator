@@ -43,6 +43,7 @@ protected:
 
 public:
   using UserAllocatorId = size_t;
+  static constexpr UserAllocatorId InvalidId = -1;
 
   inline void deallocate(void *Obj, UserAllocatorId Id) noexcept {
     // std::cerr << "deallocate(" << Id << ")\n";
@@ -53,6 +54,8 @@ public:
     *nwFL = freeList;
     configs[Id].freeList = nwFL;
   }
+
+  size_t getNumIds() const { return typeInfos.size(); }
 };
 } // namespace detail
 } // namespace mem

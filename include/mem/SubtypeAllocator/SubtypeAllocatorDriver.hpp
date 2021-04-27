@@ -23,11 +23,12 @@ class SubtypeAllocatorDriver : public detail::SubtypeAllocatorDriverBase {
   struct Block : public BlockBase {
     char data[0];
 
-    static std::pair<Block *, size_t> create(BlockBase *nxt, size_t ObjectSize,
-                                             size_t ObjectAlignment) {
+    static std::pair<Block *, size_t>
+    create(BlockBase *nxt, size_t ObjectSize, size_t ObjectAlignment,
+           size_t BlockSize = AllocationBlockSize) {
       const auto chunkSize = std::max(ObjectSize, ObjectAlignment);
       const auto offset = std::max(sizeof(Block), ObjectAlignment);
-      const auto numBytes = offset + AllocationBlockSize * chunkSize;
+      const auto numBytes = offset + BlockSize * chunkSize;
 
       auto ret = reinterpret_cast<Block *>(
           ::new (std::align_val_t{ObjectAlignment}) char[numBytes]);
@@ -45,7 +46,8 @@ class SubtypeAllocatorDriver : public detail::SubtypeAllocatorDriverBase {
 
 public:
   using UserAllocatorId = detail::SubtypeAllocatorDriverBase::UserAllocatorId;
-  static constexpr UserAllocatorId InvalidId = -1;
+  static constexpr UserAllocatorId InvalidId =
+      detail::SubtypeAllocatorDriverBase::InvalidId;
 
   explicit SubtypeAllocatorDriver() noexcept = default;
   SubtypeAllocatorDriver(const SubtypeAllocatorDriver &) = delete;
@@ -164,10 +166,54 @@ public:
     return ret;
   }
 
-  //   template <typename T, typename... Args> refc<T> make_refc(Args &&...
-  //   args) {
-  //     return refc<T>(this, getId<typename refc<T>::one_allocation>(),
-  //                    std::forward<Args>(args)...);
-  //   }
+  /// \brief Allocates enough space, such that at least the following \p
+  /// NumNewObjects allocations with the same \p Id do not require an actual
+  /// memory allocation using \c new.
+  ///
+  /// Gives better performance, if called before the first object with that \p
+  /// Id is allocated
+  /// \param Id The Id of the objects to preallocate
+  /// \param NumNewObjects The number of objects to preallocate
+  void reserve(UserAllocatorId Id, size_t NumNewObjects) {
+    // We will never call reserve(0)
+    if (__builtin_expect(NumNewObjects == 0, false))
+      return;
+
+    auto &config = configs[Id];
+
+    auto pos = config.pos;
+    const auto last = config.last;
+    auto [osize, oalign] = typeInfos[Id];
+
+    auto rem = (last - pos) / osize;
+    if (rem > NumNewObjects)
+      return;
+
+    if (__builtin_expect(rem != 0, false)) {
+      NumNewObjects -= rem;
+      // Insert the remaining elements into the free-list.
+      // Iterate in revers order to keep the original order when allocating from
+      // the free-list.
+      // Note: This is the slow path. It will (probably) never be taken, because
+      // reserving space is typically done before the first allocation.
+      auto rt = config.root;
+      auto fl = config.freeList;
+
+      for (auto *it = &rt->data[last - osize], *end = &rt->data[pos]; it >= end;
+           it -= osize) {
+        auto nxt = reinterpret_cast<void **>(it);
+        *nxt = fl;
+        fl = nxt;
+      }
+
+      config.freeList = fl;
+    }
+
+    std::tie(config.root, pos) =
+        Block::create(config.root, osize, oalign, NumNewObjects);
+
+    config.pos = pos;
+    config.last = pos + NumNewObjects * osize;
+  }
 };
 } // namespace mem

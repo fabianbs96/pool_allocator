@@ -52,6 +52,31 @@ public:
   // For internal use only
   struct one_allocation : public counter {
     std::aligned_storage_t<sizeof(T), alignof(T)> Data;
+
+    using counter::counter;
+  };
+
+  /// \brief A class that allows allocating a singleton object as refc without a
+  /// SubtypeAllocatorDriver.
+  ///
+  /// Objects of this type can neither be copied, nor moved. The intended usage
+  /// is to store them in a static variable and only work with them via a refc
+  /// view.
+  class singleton : one_allocation {
+
+    friend class refc<T>;
+
+  public:
+    /// \brief Creates the wrapped object and forwards \p args to its
+    /// constructor
+    template <typename... Args>
+    singleton(Args &&... args)
+        : one_allocation(1, detail::SubtypeAllocatorDriverBase::InvalidId,
+                         nullptr) {
+      new (&this->Data) T(std::forward<Args>(args)...);
+    }
+    singleton(const singleton &) = delete;
+    singleton(singleton &&) = delete;
   };
 
 private:
@@ -59,13 +84,15 @@ private:
   explicit refc(one_allocation *Data, std::true_type increase_counter) noexcept
       : refc_base(Data) {
     if (Data) {
-      assert(Data->Del);
       Data->Ctr.fetch_add(1, std::memory_order_relaxed);
     }
   }
 
 public:
   refc(std::nullptr_t) noexcept : refc_base(nullptr) {}
+
+  /// \brief Creates a refc from static singleton data
+  refc(singleton &Singleton) noexcept : refc(&Singleton, std::true_type{}) {}
 
   /// \brief For internal use only.
   ///
@@ -146,7 +173,7 @@ public:
     Data = nullptr;
 
     auto oldUseCount = dat->Ctr.fetch_sub(1, std::memory_order_relaxed);
-    if (oldUseCount == 1) {
+    if (oldUseCount == 1 && dat->Del) {
       auto *dataPtr = reinterpret_cast<T *>(&dat->Data);
       try {
         dataPtr->~T();

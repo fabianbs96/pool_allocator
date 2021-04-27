@@ -99,10 +99,14 @@ template <size_t AllocBlockSize, typename... Ts> class SharedPtrFactory final {
       Ids;
 
 public:
+  /// Default constructor. Does not allocate any objects
   explicit SharedPtrFactory() {
     Ids.fill(SubtypeAllocatorDriver<AllocBlockSize>::InvalidId);
   }
 
+  /// \brief Creates an object of type \p U and forwards the arguments \p args
+  /// to \p U's constructor.
+  /// \returns The newly created object wrapped into a \c std::shared_ptr
   template <typename U, typename... Args>
   std::shared_ptr<U> create(Args &&... args) {
     detail::SharedPtrFactoryAllocator<U, AllocBlockSize> Alloc(

@@ -100,6 +100,39 @@ auto shared_U = factory.create<U>(...);
 
 ...
 
+// Expect to have one object of type T and one object of type U
+// and therefore preallocate the memory for them.
+// If these initial capacities are larger than the AllocBlockSize (here 1024),
+// preallocating saves a significant number of actual memory allocations.
+// Note: Support for SharedPtrFactory preallocations is under development.
+mem::RefcFactory<1024, T, U> factory({1, 1});
+
+// Same as the example above with the SharedPtrFactory, but
+// the refc<T>/refc<U> take less memory than shared_ptr<T>/shared_ptr<U>
+auto shared_T = factory.create<T>(...);
+auto shared_U = factory.create<U>(...);
+```
+
+```C++
+#include <mem/SubtypeAllocator/refc.hpp>
+
+...
+
+// Singletons can easily be used with refc smart pointers.
+// Just use the refc::singleton struct for holding static data and implicitly
+// cast it to refc.
+mem::refc<T> getSingleton(){
+    static mem::refc<T>::singleton singletonData(...);
+    return singletonData;
+}
+
+```
+
+```C++
+#include <mem/SubtypeAllocator/SubtypeFactory.hpp>
+
+...
+
 class A{...};
 class B{...};
 class C: public A, public B{...}
