@@ -16,9 +16,9 @@ Note, it assumes a clang compiler, so if you prefer using a different C++ compil
     `refc` does not work with multiple inheritance, i.e. if `U` is subtype of `T`, then a `refc<U>` can only be assigned to `refc<T>`, if `T` is the first base class in `U`'s inheritance list (or recursively the first one in `U`'s first base-class' inheritance list).
     This is, because `refc` requires `static_cast` not to do any pointer arithmetics.
     Note: Virtual inheritance is also problematic.
-- `RefcFactory`: A factory class that can allocate objects of a fixed set of types with a self-managed `SubtypeAllocatorDriver` returning a `refc`
+- `RefcFactory`: A factory class that can allocate objects of a fixed set of types with a self-managed `SubtypeAllocatorDriver` returning a `refc` for each allocated object.
 - `SharedPtrFactory`: A factory class similar to `RefcFactory`, but returns `std::shared_ptr`s created with `std::allocate_shared`. It uses a special-purpose allocator wrapper similar to `SubtypeAllocator` under the hood that increases the (de-)allocation performance compared to `std::allocatr_shared` with a normal `SubtypeAllocator`.
-- `DefaultSharedPtrFactory`: A compatibility-class that can allocate objects of a fixed set of types with `std::make_shared`.
+- `DefaultSharedPtrFactory`: A compatibility-class that can allocate objects of a fixed set of types with `std::make_shared` (and therefore uses `std::allocator`).
 
 All provided allocators can customize the size of objects allocated at once using a template parameter.
 Currently, this parameter defaults to 1024 objects.
@@ -40,7 +40,7 @@ The below list gives a hint on when to use which of them:
     - Do you want to prepare your project that currently uses `std::shared_ptr` with `std::make_shared` for migration with pool-allocators? Start with `DefaultSharedPtrFactory` and then switch to either `SharedPtrFactory` or `RefcFactory`.
 
 A note about `std::unique_ptr`: You can use `SubtypeAllocator` to allocate your objects and then wrap them in a `std::unique_ptr` with a custom deleter that delegates to the `SubtypeAllocator`'s `deallocate` function. 
-However, the same restrictions for multiple inheritance exist like for `refc`.
+However, the same restrictions for multiple inheritance exist as for `refc`.
 
 # Examples
 
@@ -62,7 +62,7 @@ std::unordered_map<T, U, std::hash<T>, std::equal_to<T>, mem::PoolAllocator<std:
 mem::SubtypeAllocatorDriver<> driver;
 
 // Reuse the same driver for allocating different types
-// Note, that this takes linear time in the number of different types used with th driver in the worst case
+// Note, that this takes linear time in the number of different types used with the driver in the worst case
 // for both allocation and deallocation.
 auto shared_T = std::allocate_shared<T>(mem::SubtypeAllocator<T>(&Driver), ...)
 auto shared_U = std::allocate_shared<U>(mem::SubtypeAllocator<U>(&Driver), ...)
@@ -75,8 +75,9 @@ auto shared_U = std::allocate_shared<U>(mem::SubtypeAllocator<U>(&Driver), ...)
 
 mem::SharedPtrFactory<1024, T, U> factory;
 
-// Same as the example above with allocate_shared, but but allocation and 
-// deallocation here take (armortized) constant time.
+// Same as the example above with allocate_shared, but allocation and 
+// deallocation here take (armortized) constant time in the number of different 
+// allocated types.
 // Note, that the allocation-block size must be specified explicitly here
 auto shared_T = factory.create<T>(...);
 auto shared_U = factory.create<U>(...);
@@ -104,11 +105,10 @@ auto shared_U = factory.create<U>(...);
 // and therefore preallocate the memory for them.
 // If these initial capacities are larger than the AllocBlockSize (here 1024),
 // preallocating saves a significant number of actual memory allocations.
+// The other way around may save unused memory from being allocated.
 // Note: Support for SharedPtrFactory preallocations is under development.
 mem::RefcFactory<1024, T, U> factory({1, 1});
 
-// Same as the example above with the SharedPtrFactory, but
-// the refc<T>/refc<U> take less memory than shared_ptr<T>/shared_ptr<U>
 auto shared_T = factory.create<T>(...);
 auto shared_U = factory.create<U>(...);
 ```

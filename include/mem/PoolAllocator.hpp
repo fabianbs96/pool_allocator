@@ -168,7 +168,9 @@ public:
     }
   }
 
-  template <typename... Args> void construct(pointer ptr, Args &&... args) {
+  template <typename... Args>
+  void construct(pointer ptr, Args &&... args) noexcept(
+      std::is_nothrow_constructible_v<T, Args...>) {
     ::new (ptr) T(std::forward<Args>(args)...);
   }
   void destroy(pointer ptr) noexcept(std::is_nothrow_destructible_v<T>) {

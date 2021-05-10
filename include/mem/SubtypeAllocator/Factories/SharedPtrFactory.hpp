@@ -16,12 +16,14 @@ protected:
 public:
   explicit SharedPtrFactoryAllocatorBase(
       SubtypeAllocatorDriver<AllocBlockSize> *Driver,
-      typename SubtypeAllocatorDriver<AllocBlockSize>::UserAllocatorId *Id)
+      typename SubtypeAllocatorDriver<AllocBlockSize>::UserAllocatorId
+          *Id) noexcept
       : Driver(Driver), Id(Id) {}
 
-  SharedPtrFactoryAllocatorBase(const SharedPtrFactoryAllocatorBase &) =
+  SharedPtrFactoryAllocatorBase(
+      const SharedPtrFactoryAllocatorBase &) noexcept = default;
+  SharedPtrFactoryAllocatorBase(SharedPtrFactoryAllocatorBase &&) noexcept =
       default;
-  SharedPtrFactoryAllocatorBase(SharedPtrFactoryAllocatorBase &&) = default;
 };
 
 template <typename T, size_t AllocBlockSize>
@@ -31,20 +33,22 @@ class SharedPtrFactoryAllocator final
 public:
   explicit SharedPtrFactoryAllocator(
       SubtypeAllocatorDriver<AllocBlockSize> *Driver,
-      typename SubtypeAllocatorDriver<AllocBlockSize>::UserAllocatorId *Id)
+      typename SubtypeAllocatorDriver<AllocBlockSize>::UserAllocatorId
+          *Id) noexcept
       : SharedPtrFactoryAllocatorBase<AllocBlockSize>(Driver, Id) {}
 
-  SharedPtrFactoryAllocator(const SharedPtrFactoryAllocator &) = default;
-  SharedPtrFactoryAllocator(SharedPtrFactoryAllocator &&) = default;
+  SharedPtrFactoryAllocator(const SharedPtrFactoryAllocator &) noexcept =
+      default;
+  SharedPtrFactoryAllocator(SharedPtrFactoryAllocator &&) noexcept = default;
 
   template <typename U>
   SharedPtrFactoryAllocator(
-      const SharedPtrFactoryAllocator<U, AllocBlockSize> &Other)
+      const SharedPtrFactoryAllocator<U, AllocBlockSize> &Other) noexcept
       : SharedPtrFactoryAllocatorBase<AllocBlockSize>(Other) {}
 
   template <typename U>
   SharedPtrFactoryAllocator(
-      SharedPtrFactoryAllocator<U, AllocBlockSize> &&Other)
+      SharedPtrFactoryAllocator<U, AllocBlockSize> &&Other) noexcept
       : SharedPtrFactoryAllocatorBase<AllocBlockSize>(std::move(Other)) {}
 
   using size_type = size_t;

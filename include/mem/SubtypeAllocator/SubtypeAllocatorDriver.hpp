@@ -72,7 +72,7 @@ public:
   ///
   /// Returns the least number of bytes that are allocated for one object of
   /// type \p T
-  template <typename T> static constexpr size_t normalizedSize() {
+  template <typename T> static constexpr size_t normalizedSize() noexcept {
     return std::max(sizeof(void *), (sizeof(T) + 7)) & ~7;
   }
 

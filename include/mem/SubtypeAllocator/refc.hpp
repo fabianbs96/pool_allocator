@@ -70,7 +70,8 @@ public:
     /// \brief Creates the wrapped object and forwards \p args to its
     /// constructor
     template <typename... Args>
-    singleton(Args &&... args)
+    singleton(Args &&... args) noexcept(
+        std::is_nothrow_constructible_v<T, Args...>)
         : one_allocation(1, detail::SubtypeAllocatorDriverBase::InvalidId,
                          nullptr) {
       new (&this->Data) T(std::forward<Args>(args)...);
@@ -165,7 +166,7 @@ public:
   /// uses the stored SubtypeAllocatorDriver to deallocate the object woth
   /// control-block.
   /// Leaves this object in \c nullptr state
-  ~refc() noexcept {
+  ~refc() {
     if (!*this)
       return;
 
@@ -206,7 +207,7 @@ public:
 
   /// Checks whether this smart-pointer is in the \c nullptr state which means
   /// the pointee cannot be accessed.
-  bool operator==(std::nullptr_t) const { return Data; }
+  bool operator==(std::nullptr_t) const noexcept { return Data; }
 
   /// Checks pointer-equality with the Other refc smart pointer.
   /// Fails at compile-time, if \p T and \p U are not in the same inheritance
@@ -214,18 +215,18 @@ public:
   template <typename U, typename = std::enable_if_t<std::is_same_v<T, U> ||
                                                     std::is_base_of_v<U, T> ||
                                                     std::is_base_of_v<T, U>>>
-  bool operator==(const refc<U> &Other) const {
+  bool operator==(const refc<U> &Other) const noexcept {
     return Data == Other.Data;
   }
   /// Checks pointer-inequality with the Other refc smart pointer
-  template <typename U> bool operator!=(const refc<U> &Other) const {
+  template <typename U> bool operator!=(const refc<U> &Other) const noexcept {
     return !(*this == Other);
   }
 
   /// Checks pointer-equality with the Other pointer.
-  bool operator==(const T *Other) const { return get() == Other; }
+  bool operator==(const T *Other) const noexcept { return get() == Other; }
   /// Checks pointer-inequality with the Other pointer.
-  bool operator!=(const T *Other) const { return !(*this == Other); }
+  bool operator!=(const T *Other) const noexcept { return !(*this == Other); }
 
   /// Checks pointer-equality between \p Ptr1 and \p Ptr2
   friend bool operator==(const T *Ptr1, const refc<T> &Ptr2) {
@@ -246,12 +247,12 @@ private:
   ///
   /// Creates an INVALID refc smart pointer for use as empty-key in an
   /// llvm::[Small]Dense{Set,Map}
-  static refc getEmptyKey() { return refc((one_allocation *)-1); }
+  static refc getEmptyKey() noexcept { return refc((one_allocation *)-1); }
   /// For internal use only.
   ///
   /// Creates an INVALID refc smart pointer for use as tombstone-key in an
   /// llvm::[Small]Dense{Set,Map}
-  static refc getTombstoneKey() { return refc((one_allocation *)-2); }
+  static refc getTombstoneKey() noexcept { return refc((one_allocation *)-2); }
 
   /// For internal use only.
   ///
@@ -297,7 +298,7 @@ template <typename T> llvm::hash_code hash_value(const refc<T> &Rc) {
 
 namespace std {
 template <typename T> struct hash<mem::refc<T>> {
-  size_t operator()(const mem::refc<T> &Rc) const {
+  size_t operator()(const mem::refc<T> &Rc) const noexcept {
     constexpr size_t MagicFactor =
         sizeof(size_t) == 32 ? 2654435769UL : 11400714819323198485LLU;
     return std::hash<const T *>()() * MagicFactor;

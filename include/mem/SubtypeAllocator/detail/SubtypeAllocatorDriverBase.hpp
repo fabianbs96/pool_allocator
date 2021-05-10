@@ -55,7 +55,7 @@ public:
     configs[Id].freeList = nwFL;
   }
 
-  size_t getNumIds() const { return typeInfos.size(); }
+  size_t getNumIds() const noexcept { return typeInfos.size(); }
 };
 } // namespace detail
 } // namespace mem
